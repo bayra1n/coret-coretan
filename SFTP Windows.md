@@ -1,3 +1,5 @@
+# SFTP WINDOWS SERVER
+
 Untuk mengkonfigurasi SFTP dengan cara yang memungkinkan Anda untuk mounting folder dari Windows Server A (192.168.1.2) ke Windows Server B (192.168.1.3) tanpa menggunakan Samba dan mengubah port SFTP ke 4522, Anda dapat mengikuti langkah-langkah berikut. Ini melibatkan setup OpenSSH di Windows dan mengkonfigurasi SFTP untuk melakukan mounting folder di jaringan.
 
 ### Langkah-langkah Konfigurasi:
