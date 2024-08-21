@@ -1,70 +1,75 @@
+Untuk mengkonfigurasi SFTP dengan cara yang memungkinkan Anda untuk mounting folder dari Windows Server A (192.168.1.2) ke Windows Server B (192.168.1.3) tanpa menggunakan Samba dan mengubah port SFTP ke 4522, Anda dapat mengikuti langkah-langkah berikut. Ini melibatkan setup OpenSSH di Windows dan mengkonfigurasi SFTP untuk melakukan mounting folder di jaringan.
 
-# SFTP WINDOWS SERVER
+### Langkah-langkah Konfigurasi:
 
-
-Ya, Anda bisa menggunakan SFTP untuk mengakses dan mengelola folder dari Windows Server A di Windows Server B tanpa menggunakan Samba. Namun, perlu dicatat bahwa SFTP (Secure File Transfer Protocol) biasanya digunakan untuk transfer file dan tidak mendukung mounting direktori secara langsung seperti NFS atau SMB. Tetapi, Anda bisa menggunakan tools tertentu yang memungkinkan SFTP untuk diakses seolah-olah seperti drive atau folder yang di-mount pada sistem Windows, misalnya menggunakan *WinSCP* atau *SSHFS-Win*.
-
-### Langkah-langkah Konfigurasi
-
-#### 1. **Setup SFTP Server di Windows Server A**
-
-Pertama, kita akan mengonfigurasi Windows Server A untuk menjalankan SFTP server. Anda bisa menggunakan OpenSSH Server yang tersedia di Windows.
-
+#### **1. Instal dan Konfigurasi OpenSSH Server di Windows Server A (192.168.1.2)**
 1. **Instal OpenSSH Server:**
-   - Buka *Settings* > *Apps* > *Optional Features*.
-   - Scroll ke bawah dan klik *Add a feature*.
-   - Cari *OpenSSH Server* dan klik *Install*.
+   - Buka *Settings* > *Apps* > *Optional Features* > *Add a feature*.
+   - Cari *OpenSSH Server* dan instal.
 
-2. **Konfigurasi SFTP Server:**
-   - Setelah instalasi, buka *Services* (Anda bisa mengetik "Services" di Start menu).
-   - Temukan layanan *OpenSSH SSH Server*, klik kanan, dan pilih *Start*. Anda juga bisa mengatur layanan ini agar otomatis mulai dengan memilih *Properties* dan mengatur *Startup type* ke *Automatic*.
-   
-3. **Setup Direktori SFTP:**
-   - Buat direktori pengguna khusus untuk SFTP atau gunakan yang sudah ada. Misalnya, kita akan menggunakan `D:/wadaw/` sebagai direktori SFTP.
-   - Pastikan pengguna yang mengakses SFTP memiliki izin yang tepat pada folder tersebut.
-   - Anda bisa mengonfigurasi `sshd_config` (konfigurasi OpenSSH) untuk menentukan direktori mana yang bisa diakses oleh pengguna tertentu. File konfigurasi ini biasanya ada di `C:\ProgramData\ssh\sshd_config`.
+2. **Konfigurasi OpenSSH untuk SFTP:**
+   - Buka file konfigurasi OpenSSH. File konfigurasi ini biasanya terletak di `C:\ProgramData\ssh\sshd_config`.
+   - Buka file `sshd_config` menggunakan text editor seperti Notepad.
 
-    ```text
-    Match User [username]
-      ChrootDirectory D:/wadaw
-      ForceCommand internal-sftp
-      AllowTcpForwarding no
-      X11Forwarding no
-    ```
+3. **Ubah Port SSH:**
+   - Cari baris yang mengatakan `#Port 22` dan ubah menjadi `Port 4522`.
+   - Ini mengubah port SSH dari default 22 ke 4522.
 
-   - Restart layanan *OpenSSH SSH Server* agar perubahan berlaku:
-     ```cmd
+4. **Konfigurasi SFTP:**
+   - Dalam file `sshd_config`, pastikan ada entri untuk `Subsystem sftp` seperti ini:
+     ```bash
+     Subsystem sftp internal-sftp
+     ```
+   - Untuk memastikan keamanan, tambahkan konfigurasi berikut di bagian bawah file:
+     ```bash
+     Match User sftpuser
+         ChrootDirectory D:/wadaw
+         ForceCommand internal-sftp
+         AllowTcpForwarding no
+         X11Forwarding no
+     ```
+     Ini mengkonfigurasi user `sftpuser` untuk hanya memiliki akses ke folder `D:/wadaw` dan hanya bisa menggunakan SFTP.
+
+5. **Buat Pengguna untuk SFTP:**
+   - Buat pengguna Windows dengan perintah berikut di Command Prompt (dengan administrator):
+     ```bash
+     net user sftpuser YourPassword123 /add
+     ```
+   - Tambahkan pengguna ini ke grup pengguna `SFTP Users` untuk memberikan akses yang dibutuhkan.
+
+6. **Restart Layanan SSH:**
+   - Setelah mengubah konfigurasi, restart layanan SSH untuk menerapkan perubahan:
+     ```bash
      net stop sshd
      net start sshd
      ```
 
-#### 2. **Mount SFTP sebagai Drive di Windows Server B**
+#### **2. Konfigurasi Windows Server B (192.168.1.3) untuk Mounting Folder via SFTP**
+1. **Instal WinSCP atau Dokany:**
+   - Di Windows Server B, instal WinSCP (GUI) atau Dokany (untuk mounting secara langsung) yang mendukung koneksi SFTP.
 
-Sekarang, kita akan mengonfigurasi Windows Server B untuk mengakses dan memount folder yang tersedia di Windows Server A sebagai drive melalui SFTP.
+2. **Konfigurasi WinSCP untuk Koneksi SFTP:**
+   - Buka WinSCP, pilih *New Site*.
+   - Pilih *File Protocol: SFTP*.
+   - Isi *Host name* dengan `192.168.1.2` dan *Port number* dengan `4522`.
+   - Masukkan username `sftpuser` dan password yang Anda buat sebelumnya.
+   - Klik *Advanced* > *Directories* > *Remote directory* dan masukkan path `D:/wadaw`.
+   - Simpan konfigurasi dan koneksi.
 
-1. **Instal SSHFS-Win:**
-   - *SSHFS-Win* adalah driver yang memungkinkan Anda untuk mount direktori yang diakses melalui SFTP sebagai drive di Windows.
-   - Download dan instal *SSHFS-Win* dari [GitHub repository SSHFS-Win](https://github.com/billziss-gh/sshfs-win/releases).
-
-2. **Mount Folder dari Windows Server A di Windows Server B:**
-   - Buka Command Prompt atau PowerShell dengan hak administrator.
-   - Gunakan perintah `net use` dengan `sshfs` untuk mounting folder dari SFTP:
-     ```bash
-     net use Z: \\sshfs\username@ServerA:/wadaw
+3. **Mounting Folder secara Otomatis:**
+   - WinSCP memungkinkan untuk melakukan "Keep remote directory up to date", namun untuk mounting secara otomatis, Anda bisa menggunakan Dokany atau perangkat lunak lain seperti `sshfs-win`.
+   - Jika menggunakan `sshfs-win`, Anda dapat menjalankan perintah berikut di PowerShell (dengan administrator):
+     ```powershell
+     net use Z: \\sshfs\user@192.168.1.2!4522\D:\wadaw /user:sftpuser YourPassword123
      ```
-     Gantilah `username` dengan nama pengguna SFTP yang sudah diatur di Windows Server A dan `ServerA` dengan alamat IP atau hostname dari Windows Server A.
+   - Ini akan mem-mount folder `D:/wadaw` dari Windows Server A ke drive Z: di Windows Server B melalui SFTP.
 
-3. **Konfigurasi Credential:**
-   - Anda mungkin akan diminta untuk memasukkan password untuk pengguna SFTP. Anda bisa menyimpan credential ini agar tidak perlu memasukkannya setiap kali melakukan mounting.
+#### **3. Verifikasi dan Pengujian**
+1. **Cek Koneksi:**
+   - Pastikan bahwa Anda bisa mengakses `Z:` di Windows Server B dan melihat isi dari `D:/wadaw` di Windows Server A.
+  
+2. **Troubleshooting:**
+   - Jika ada masalah, pastikan firewall di kedua server mengizinkan port 4522, dan cek log SSH di Windows Server A untuk kesalahan.
 
-4. **Akses Folder yang Di-mount:**
-   - Setelah di-mount, folder dari Windows Server A akan muncul sebagai drive `Z:` di Windows Server B. Anda bisa mengaksesnya seperti drive biasa melalui File Explorer.
-
-5. **Otomatisasi Mounting (Opsional):**
-   - Anda bisa membuat script batch untuk otomatis mounting saat startup. Buat file `.bat` dengan perintah `net use` di atas dan tambahkan ke *Task Scheduler* agar berjalan saat login.
-
-### Kesimpulan
-
-Dengan menggunakan SFTP dan tool seperti SSHFS-Win, Anda bisa mengakses dan "mount" folder dari Windows Server A di Windows Server B tanpa menggunakan Samba. Proses ini memerlukan pengaturan OpenSSH Server di Windows Server A dan menggunakan SSHFS-Win di Windows Server B untuk melakukan mounting folder sebagai drive.
-
-Metode ini tidak menggunakan Samba dan tetap aman karena SFTP menggunakan enkripsi SSH untuk melindungi data yang dikirimkan di antara server. Pastikan juga bahwa Anda mengelola izin dengan baik pada folder dan pengguna untuk menjaga keamanan data Anda.
+### Kesimpulan:
+Dengan mengikuti langkah-langkah di atas, Anda dapat melakukan sharing folder di jaringan antara dua server Windows melalui SFTP, tanpa menggunakan Samba. Port default untuk SFTP (port 22) telah diubah menjadi 4522 untuk keamanan tambahan. Proses ini melibatkan instalasi OpenSSH di Windows Server A, konfigurasi pengguna dan folder, serta setup koneksi SFTP di Windows Server B.
