@@ -2,61 +2,69 @@
 # SFTP WINDOWS SERVER
 
 
-Ya, Anda dapat menggunakan SFTP (Secure File Transfer Protocol) untuk mengelola file secara aman antara Windows Server A dan Windows Server B. Namun, perlu diperhatikan bahwa SFTP secara tradisional digunakan untuk transfer file dan bukan untuk mounting file system seperti NFS atau SMB. Meskipun demikian, ada beberapa cara untuk mencapai tujuan yang Anda inginkan, yaitu mengakses dan menggunakan file yang di-host di Windows Server A dari Windows Server B melalui SFTP. Berikut adalah cara melakukannya:
+Ya, Anda bisa menggunakan SFTP untuk mengakses dan mengelola folder dari Windows Server A di Windows Server B tanpa menggunakan Samba. Namun, perlu dicatat bahwa SFTP (Secure File Transfer Protocol) biasanya digunakan untuk transfer file dan tidak mendukung mounting direktori secara langsung seperti NFS atau SMB. Tetapi, Anda bisa menggunakan tools tertentu yang memungkinkan SFTP untuk diakses seolah-olah seperti drive atau folder yang di-mount pada sistem Windows, misalnya menggunakan *WinSCP* atau *SSHFS-Win*.
 
-### 1. **Menyediakan SFTP Server pada Windows Server A**
+### Langkah-langkah Konfigurasi
 
-Pertama, Anda perlu menyiapkan SFTP server pada Windows Server A.
+#### 1. **Setup SFTP Server di Windows Server A**
 
-#### Langkah-langkah:
-1. **Instal SFTP Server:**
-   - Anda bisa menggunakan software SFTP server seperti OpenSSH (yang sudah termasuk dalam versi Windows yang lebih baru), FileZilla Server, atau Bitvise SSH Server.
-   - Contoh: Menggunakan OpenSSH yang sudah tersedia pada Windows 10/Server 2019 atau lebih baru:
-     - Buka *Settings* > *Apps* > *Optional Features*.
-     - Cari dan tambahkan *OpenSSH Server*.
-     - Setelah instalasi, jalankan layanan OpenSSH Server dari *Services.msc*.
+Pertama, kita akan mengonfigurasi Windows Server A untuk menjalankan SFTP server. Anda bisa menggunakan OpenSSH Server yang tersedia di Windows.
 
-2. **Konfigurasi Pengguna:**
-   - Tentukan pengguna yang memiliki akses ke SFTP. Anda dapat menggunakan pengguna Windows yang ada, atau membuat akun khusus untuk SFTP.
+1. **Instal OpenSSH Server:**
+   - Buka *Settings* > *Apps* > *Optional Features*.
+   - Scroll ke bawah dan klik *Add a feature*.
+   - Cari *OpenSSH Server* dan klik *Install*.
 
-3. **Akses SFTP:**
-   - Uji akses SFTP dari komputer lain dengan menggunakan client SFTP seperti WinSCP atau FileZilla untuk memastikan bahwa SFTP server berfungsi dengan baik.
-
-### 2. **Mengakses SFTP dari Windows Server B**
-
-Setelah SFTP server di Windows Server A siap, Anda bisa mengakses file dari Windows Server B. Untuk "mounting" SFTP sebagai drive, Anda akan membutuhkan software tambahan, karena Windows tidak mendukung mounting SFTP secara native.
-
-#### Gunakan Dokan atau WinFsp + SSHFS untuk Mounting SFTP:
-
-**Dokan SSHFS:**
-1. **Install Dokan Library**: Dokan Library memungkinkan Anda untuk mengemulasi file system menggunakan SFTP.
-   - Unduh dan instal Dokan dari [situs resmi Dokan](https://dokan-dev.github.io/).
-   - Setelah itu, instal SSHFS-Win yang memungkinkan Anda untuk mounting SFTP sebagai drive di Windows.
-     - SSHFS-Win dapat diunduh dari [GitHub SSHFS-Win](https://github.com/billziss-gh/sshfs-win).
-
-2. **Mounting SFTP:**
-   - Buka Command Prompt dengan hak administrator.
-   - Gunakan perintah berikut untuk mounting:
-     ```bash
-     sshfs-win svc \user@hostname:/remote_path X:
-     ```
-   - `user@hostname:/remote_path` adalah kredensial dan jalur ke SFTP server Anda di Windows Server A.
-   - `X:` adalah huruf drive yang akan digunakan pada Windows Server B.
-
-**WinFsp + SSHFS:**
-1. **Install WinFsp**: WinFsp adalah file system for Windows yang memungkinkan implementasi file system di ruang pengguna.
-   - Unduh dan instal WinFsp dari [situs resmi WinFsp](http://www.secfs.net/winfsp/).
+2. **Konfigurasi SFTP Server:**
+   - Setelah instalasi, buka *Services* (Anda bisa mengetik "Services" di Start menu).
+   - Temukan layanan *OpenSSH SSH Server*, klik kanan, dan pilih *Start*. Anda juga bisa mengatur layanan ini agar otomatis mulai dengan memilih *Properties* dan mengatur *Startup type* ke *Automatic*.
    
-2. **Install SSHFS**:
-   - Instal SSHFS yang merupakan file system client menggunakan SFTP.
-   - Gunakan command berikut untuk mounting:
-     ```bash
-     sshfs user@hostname:/remote_path X:
+3. **Setup Direktori SFTP:**
+   - Buat direktori pengguna khusus untuk SFTP atau gunakan yang sudah ada. Misalnya, kita akan menggunakan `D:/wadaw/` sebagai direktori SFTP.
+   - Pastikan pengguna yang mengakses SFTP memiliki izin yang tepat pada folder tersebut.
+   - Anda bisa mengonfigurasi `sshd_config` (konfigurasi OpenSSH) untuk menentukan direktori mana yang bisa diakses oleh pengguna tertentu. File konfigurasi ini biasanya ada di `C:\ProgramData\ssh\sshd_config`.
+
+    ```text
+    Match User [username]
+      ChrootDirectory D:/wadaw
+      ForceCommand internal-sftp
+      AllowTcpForwarding no
+      X11Forwarding no
+    ```
+
+   - Restart layanan *OpenSSH SSH Server* agar perubahan berlaku:
+     ```cmd
+     net stop sshd
+     net start sshd
      ```
-   - Sama seperti sebelumnya, ganti `user@hostname:/remote_path` dan `X:` sesuai dengan konfigurasi Anda.
 
-### 3. **Mengakses Folder yang di-Mount di Windows Server B**
-Setelah SFTP di-mount sebagai drive di Windows Server B, Anda dapat mengaksesnya seperti drive lokal lainnya di Windows Explorer, Command Prompt, atau aplikasi lain yang memerlukan akses ke file.
+#### 2. **Mount SFTP sebagai Drive di Windows Server B**
 
-### **Kesimpulan:**
-Meskipun Windows tidak mendukung mounting SFTP secara native, Anda dapat menggunakan alat seperti Dokan SSHFS atau WinFsp + SSHFS untuk melakukan mounting SFTP server pada Windows Server B. Ini memungkinkan Anda mengakses file di Windows Server A melalui SFTP seolah-olah mereka adalah bagian dari file system lokal di Windows Server B. Metode ini memberikan keamanan tambahan melalui enkripsi SFTP dan memungkinkan manajemen file yang efisien antar server.
+Sekarang, kita akan mengonfigurasi Windows Server B untuk mengakses dan memount folder yang tersedia di Windows Server A sebagai drive melalui SFTP.
+
+1. **Instal SSHFS-Win:**
+   - *SSHFS-Win* adalah driver yang memungkinkan Anda untuk mount direktori yang diakses melalui SFTP sebagai drive di Windows.
+   - Download dan instal *SSHFS-Win* dari [GitHub repository SSHFS-Win](https://github.com/billziss-gh/sshfs-win/releases).
+
+2. **Mount Folder dari Windows Server A di Windows Server B:**
+   - Buka Command Prompt atau PowerShell dengan hak administrator.
+   - Gunakan perintah `net use` dengan `sshfs` untuk mounting folder dari SFTP:
+     ```bash
+     net use Z: \\sshfs\username@ServerA:/wadaw
+     ```
+     Gantilah `username` dengan nama pengguna SFTP yang sudah diatur di Windows Server A dan `ServerA` dengan alamat IP atau hostname dari Windows Server A.
+
+3. **Konfigurasi Credential:**
+   - Anda mungkin akan diminta untuk memasukkan password untuk pengguna SFTP. Anda bisa menyimpan credential ini agar tidak perlu memasukkannya setiap kali melakukan mounting.
+
+4. **Akses Folder yang Di-mount:**
+   - Setelah di-mount, folder dari Windows Server A akan muncul sebagai drive `Z:` di Windows Server B. Anda bisa mengaksesnya seperti drive biasa melalui File Explorer.
+
+5. **Otomatisasi Mounting (Opsional):**
+   - Anda bisa membuat script batch untuk otomatis mounting saat startup. Buat file `.bat` dengan perintah `net use` di atas dan tambahkan ke *Task Scheduler* agar berjalan saat login.
+
+### Kesimpulan
+
+Dengan menggunakan SFTP dan tool seperti SSHFS-Win, Anda bisa mengakses dan "mount" folder dari Windows Server A di Windows Server B tanpa menggunakan Samba. Proses ini memerlukan pengaturan OpenSSH Server di Windows Server A dan menggunakan SSHFS-Win di Windows Server B untuk melakukan mounting folder sebagai drive.
+
+Metode ini tidak menggunakan Samba dan tetap aman karena SFTP menggunakan enkripsi SSH untuk melindungi data yang dikirimkan di antara server. Pastikan juga bahwa Anda mengelola izin dengan baik pada folder dan pengguna untuk menjaga keamanan data Anda.
